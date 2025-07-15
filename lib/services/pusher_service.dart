@@ -25,7 +25,7 @@ class PusherService extends GetxService {
       _pusher = PusherClient(
         '78f7cee4050aca7ef0a4',
         PusherOptions(
-          host: "192.168.100.94",
+          host: "192.168.1.16",
           wsPort: 6001,
           cluster: 'us2',
           encrypted: true,

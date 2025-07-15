@@ -8,14 +8,22 @@ class NotificationService extends GetxService {
 
   List<Notification> get notifications => _notifications;
 
-  /// Fetches all notifications from the server
+  /// Fetches all notifications from the server - adapts to Laravel response structure
   Future<void> fetchNotifications() async {
     try {
       final response = await _apiService.get('/api/notifications');
+
+      // ✅ FIX: Handle different Laravel response structures
+      List<dynamic> notificationsData;
+      if (response.data is List) {
+        notificationsData = response.data; // Direct array from Laravel
+      } else {
+        notificationsData =
+            response.data['notifications'] ?? []; // Wrapped array fallback
+      }
+
       _notifications.assignAll(
-        (response.data['notifications'] as List)
-            .map((json) => Notification.fromJson(json))
-            .toList(),
+        notificationsData.map((json) => Notification.fromJson(json)).toList(),
       );
     } catch (e) {
       throw Exception('Failed to fetch notifications: $e');

@@ -1,6 +1,6 @@
-import 'package:feeling_sync_chat/services/auth_service.dart';
 import 'package:feeling_sync_chat/views/drawer%20pages/friend_requests_page.dart';
 import 'package:feeling_sync_chat/controllers/home_page_controller.dart';
+import 'package:feeling_sync_chat/services/auth_service.dart';
 import 'package:feeling_sync_chat/constant/api_constant.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:feeling_sync_chat/views/login_page.dart';
@@ -14,7 +14,6 @@ import 'dart:math';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
-
   @override
   _HomePageState createState() => _HomePageState();
 }
@@ -23,11 +22,9 @@ class _HomePageState extends State<HomePage> {
   final HomePageController controller = Get.put(HomePageController());
   final TextEditingController searchController = TextEditingController();
   final authService = Get.find<AuthService>();
-
   // Used to generate some random dates (for demonstration)
   final List<String> randomDates =
       List.generate(10, (index) => generateRandomDate());
-
   static String generateRandomDate() {
     final random = Random();
     final now = DateTime.now();
@@ -48,13 +45,77 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  @override
-  void dispose() {
-    searchController.dispose();
-    super.dispose();
+  /// 🔥 KEY FIX: Enhanced method to get valid currentUserId
+  Future<int> getValidCurrentUserId() async {
+    print('🔍 DEBUG - getValidCurrentUserId called');
+
+    // First, try to get from AuthService
+    final currentUserId = authService.currentUserId;
+    print('🔍 DEBUG - AuthService.currentUserId: $currentUserId');
+
+    if (currentUserId != null && currentUserId > 0) {
+      print('🔍 DEBUG - Using AuthService currentUserId: $currentUserId');
+      return currentUserId;
+    }
+
+    // If AuthService is null/0, try SharedPreferences
+    print(
+        '🔍 DEBUG - AuthService currentUserId is null/0, checking SharedPreferences');
+    final prefs = await SharedPreferences.getInstance();
+    final storedUserId = prefs.getInt('user_id');
+    print('🔍 DEBUG - SharedPreferences user_id: $storedUserId');
+
+    if (storedUserId != null && storedUserId > 0) {
+      // Update AuthService with the stored value
+      authService.setCurrentUserId(storedUserId);
+      print('🔍 DEBUG - Updated AuthService with stored userId: $storedUserId');
+      return storedUserId;
+    }
+
+    // If still nothing, try to force reload from SharedPreferences
+    print('🔍 DEBUG - Attempting to force load userId');
+    await authService.forceLoadUserId();
+    final reloadedUserId = authService.currentUserId;
+
+    if (reloadedUserId != null && reloadedUserId > 0) {
+      print('🔍 DEBUG - Successfully reloaded userId: $reloadedUserId');
+      return reloadedUserId;
+    }
+
+    print('❌ DEBUG - No valid userId found anywhere, defaulting to 0');
+    return 0;
   }
 
-  // Function to call the remove friend API
+  /// 🔥 KEY FIX: Enhanced navigation method that ensures valid currentUserId
+  Future<void> navigateToChat(
+      String friendName, int chatId, int friendId) async {
+    print(
+        '🔍 DEBUG - navigateToChat called: friendName=$friendName, chatId=$chatId, friendId=$friendId');
+
+    final currentUserId = await getValidCurrentUserId();
+
+    if (currentUserId == 0) {
+      print('❌ ERROR - Cannot navigate to chat: currentUserId is 0');
+      Get.snackbar(
+        "Error",
+        "Unable to identify current user. Please try logging in again.",
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    print('🔍 DEBUG - Navigating to chat with currentUserId: $currentUserId');
+
+    Get.to(() => ChatView(
+          friendName: friendName,
+          chatId: chatId,
+          friendId: friendId,
+          currentUserId: currentUserId,
+        ));
+  }
+
   Future<void> _deleteFriend(int friendId, int index) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
@@ -70,7 +131,6 @@ class _HomePageState extends State<HomePage> {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       });
-
       if (response.statusCode == 200) {
         Get.snackbar("Success", "Friend removed successfully.");
         // Remove the friend from the list
@@ -98,55 +158,39 @@ class _HomePageState extends State<HomePage> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        centerTitle: true,
+        centerTitle: false,
+        elevation: 0,
       ),
       drawer: _buildDrawer(context),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          double screenWidth = constraints.maxWidth;
-          double screenHeight = constraints.maxHeight;
+      body: Obx(
+        () {
           return Column(
             children: [
               // Search Bar
               Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth * 0.05,
-                  vertical: screenHeight * 0.02,
-                ),
+                padding: const EdgeInsets.all(16.0),
                 child: TextField(
                   controller: searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search friends...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                  ),
                   onSubmitted: (value) {
                     if (value.trim().isNotEmpty) {
                       controller.searchFriend(value.trim());
-                      setState(() {}); // Trigger rebuild to show search results
                     }
                   },
-                  decoration: InputDecoration(
-                    hintText: "Search for added users",
-                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: Colors.black, width: 1),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
                 ),
               ),
-              // Display search result if text is entered; otherwise, show accepted friends list.
+              // Content area
               Expanded(
                 child: Obx(() {
                   if (searchController.text.trim().isNotEmpty) {
-                    if (controller.isSearching.value) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (controller.searchError.value.isNotEmpty) {
-                      return Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Text(controller.searchError.value,
-                            style: const TextStyle(color: Colors.red)),
-                      );
-                    } else if (controller.searchResult.value != null) {
+                    // If there's text in the search bar, show search results or the search button.
+                    if (controller.searchResult.value != null) {
                       final friend = controller.searchResult.value!;
                       return ListTile(
                         title: Text(friend.name),
@@ -161,12 +205,9 @@ class _HomePageState extends State<HomePage> {
                             chatId = await controller.createChat(friendId);
                           }
                           if (chatId != null) {
-                            Get.to(() => ChatView(
-                                  friendName: friend.name,
-                                  chatId: chatId!,
-                                  friendId: friendId, 
-                                  currentUserId: authService.currentUserId ?? 0,
-                                ));
+                            // 🔥 KEY FIX: Use enhanced navigation method
+                            await navigateToChat(
+                                friend.name, chatId!, friendId);
                           } else {
                             Get.snackbar("Error",
                                 "Unable to create chat for ${friend.name}");
@@ -196,7 +237,7 @@ class _HomePageState extends State<HomePage> {
                           chatId: friend.chatId,
                           screenWidth: MediaQuery.of(context).size.width,
                           // Force non-null friend id using !
-                          friendId: (friend.chatId)!,
+                          friendId: (friend.id),
                           index: index,
                         );
                       },
@@ -225,6 +266,8 @@ class _HomePageState extends State<HomePage> {
           try {
             final newChatId = await controller.createChat(friendId);
             if (newChatId != null) {
+              print(
+                  '🔍 DEBUG - Created new chat: $newChatId, using route navigation');
               Get.toNamed("${Routes.CHAT}/$userName/$newChatId/$friendId");
             } else {
               Get.snackbar(
@@ -245,12 +288,8 @@ class _HomePageState extends State<HomePage> {
             );
           }
         } else {
-          Get.to(() => ChatView(
-                friendName: userName,
-                chatId: chatId,
-                friendId: friendId, 
-                currentUserId: authService.currentUserId ?? 0,
-              ));
+          // 🔥 KEY FIX: Use enhanced navigation method
+          await navigateToChat(userName, chatId, friendId);
         }
       },
       onLongPress: () {
@@ -362,12 +401,10 @@ class _HomePageState extends State<HomePage> {
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
-
     if (token == null) {
       Get.snackbar("Error", "User is not logged in.");
       return;
     }
-
     try {
       final response = await http.post(
         Uri.parse('${ApiConstants.baseUrl}/api/logout'),
@@ -376,9 +413,9 @@ class _HomePageState extends State<HomePage> {
           'Content-Type': 'application/json',
         },
       );
-
       if (response.statusCode == 200) {
         await prefs.remove('auth_token');
+        await prefs.remove('user_id'); // Also clear user_id
         Get.offAll(() => LoginPage());
       } else {
         final message = jsonDecode(response.body)['message'];

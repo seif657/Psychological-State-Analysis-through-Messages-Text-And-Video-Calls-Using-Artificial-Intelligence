@@ -4,11 +4,11 @@ import 'package:get/get.dart';
 
 class SignupPage extends StatelessWidget {
   final SignupController controller = Get.put(SignupController());
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController =
-      TextEditingController();
+  // final TextEditingController nameController = TextEditingController();
+  // final TextEditingController emailController = TextEditingController();
+  // final TextEditingController passwordController = TextEditingController();
+  // final TextEditingController confirmPasswordController =
+  //     TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +64,7 @@ class SignupPage extends StatelessWidget {
     return Column(
       children: [
         TextField(
-          controller: nameController,
+          controller: controller.nameController,
           decoration: InputDecoration(
             labelText: 'Name',
             border: OutlineInputBorder(
@@ -74,7 +74,7 @@ class SignupPage extends StatelessWidget {
         ),
         SizedBox(height: 16),
         TextField(
-          controller: emailController,
+          controller: controller.emailController,
           decoration: InputDecoration(
             labelText: 'Email',
             border: OutlineInputBorder(
@@ -84,7 +84,7 @@ class SignupPage extends StatelessWidget {
         ),
         SizedBox(height: 16),
         TextField(
-          controller: passwordController,
+          controller: controller.passwordController,
           obscureText: true,
           decoration: InputDecoration(
             labelText: 'Password',
@@ -95,7 +95,7 @@ class SignupPage extends StatelessWidget {
         ),
         SizedBox(height: 16),
         TextField(
-          controller: confirmPasswordController,
+          controller: controller.confirmPasswordController,
           obscureText: true,
           decoration: InputDecoration(
             labelText: 'Re-enter Password',
@@ -114,13 +114,13 @@ class SignupPage extends StatelessWidget {
         onPressed: controller.isLoading.value
             ? null
             : () {
-                final email = emailController.text.trim();
-                final password = passwordController.text;
-                final confirmPassword = confirmPasswordController.text;
+                final email = controller.emailController;
+                final password = controller.passwordController;
+                final confirmPassword = controller.confirmPasswordController;
 
                 // Email validation: only letters and numbers before "@emoconnect"
                 RegExp emailRegExp = RegExp(r'^[a-zA-Z0-9]+@emoconnect.com$');
-                if (!emailRegExp.hasMatch(email)) {
+                if (!emailRegExp.hasMatch(email.text)) {//*
                   Get.snackbar(
                     'Error',
                     'Email must contain only letters and numbers followed by @emoconnect',
@@ -135,8 +135,8 @@ class SignupPage extends StatelessWidget {
                 // and at least one special symbol (e.g., !, @)
                 RegExp uppercaseRegExp = RegExp(r'(.*[A-Z].*[A-Z])');
                 RegExp specialCharRegExp = RegExp(r'[!@#\$%^&*(),.?":{}|<>]');
-                if (!uppercaseRegExp.hasMatch(password) ||
-                    !specialCharRegExp.hasMatch(password)) {
+                if (!uppercaseRegExp.hasMatch(password.text) ||
+                    !specialCharRegExp.hasMatch(password.text)) {
                   Get.snackbar(
                     'Error',
                     'Password must contain at least 2 uppercase letters and at least one special symbol (e.g., !, @)',
@@ -148,7 +148,7 @@ class SignupPage extends StatelessWidget {
                 }
 
                 // Re-enter Password validation
-                if (password != confirmPassword) {
+                if (password.text != confirmPassword.text) {
                   Get.snackbar(
                     'Error',
                     'Passwords do not match',
@@ -160,7 +160,8 @@ class SignupPage extends StatelessWidget {
                 }
 
                 // All validations passed, proceed with signup
-                controller.signUp(nameController.text, email, password);
+                // controller.signUp(nameController.text, email, password);
+                controller.signUp(controller.nameController.text, email.text, password.text);
               },
         child: controller.isLoading.value
             ? CircularProgressIndicator(

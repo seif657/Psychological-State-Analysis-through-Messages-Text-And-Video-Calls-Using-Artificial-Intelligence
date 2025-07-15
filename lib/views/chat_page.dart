@@ -3,13 +3,11 @@ import 'package:feeling_sync_chat/controllers/chat_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:async';
-
 class ChatView extends StatefulWidget {
   final String friendName;
   final int chatId;
   final int friendId;
   final int currentUserId; // Add this parameter to pass current user id
-
   ChatView({
     super.key,
     required this.friendName,
@@ -17,21 +15,20 @@ class ChatView extends StatefulWidget {
     required this.friendId,
     required this.currentUserId, // Required currentUserId here
   });
-
   @override
   _ChatViewState createState() => _ChatViewState();
 }
-
 class _ChatViewState extends State<ChatView> {
   final TextEditingController messageController = TextEditingController();
   final ScrollController scrollController = ScrollController();
   late ChatController chatController;
   Timer? refreshTimer;
-
   @override
   void initState() {
     super.initState();
     if (widget.chatId != 0) {
+      // Debug print to verify currentUserId
+      print('🔍 DEBUG - Current User ID: ${widget.currentUserId}');
       chatController = Get.put(
         ChatController(
           chatId: widget.chatId,
@@ -40,13 +37,11 @@ class _ChatViewState extends State<ChatView> {
         tag: widget.chatId.toString(),
       );
       chatController.loadMessages();
-
       refreshTimer = Timer.periodic(Duration(seconds: 5), (timer) {
         chatController.loadMessages();
       });
     }
   }
-
   @override
   void dispose() {
     messageController.dispose();
@@ -54,7 +49,6 @@ class _ChatViewState extends State<ChatView> {
     refreshTimer?.cancel();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -96,7 +90,6 @@ class _ChatViewState extends State<ChatView> {
               if (chatController.messages.isEmpty) {
                 return const Center(child: Text("No messages yet."));
               }
-
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (scrollController.hasClients) {
                   scrollController.animateTo(
@@ -106,15 +99,15 @@ class _ChatViewState extends State<ChatView> {
                   );
                 }
               });
-
               return ListView.builder(
                 controller: scrollController,
                 itemCount: chatController.messages.length,
                 itemBuilder: (context, index) {
                   final message = chatController.messages[index];
-                  final bool isSentByMe =
-                      message.userId == chatController.currentUserId; // Remove .value here
-
+                  final bool isSentByMe = message.isFromUser(chatController.currentUserId);
+                  // Debug print to verify comparison
+                  print(
+                      '🔍 DEBUG - Message userId: ${message.userId}, ChatController currentUserId: ${chatController.currentUserId}, isSentByMe: $isSentByMe');
                   return GestureDetector(
                     onLongPress: () {
                       if (isSentByMe) {
@@ -122,7 +115,8 @@ class _ChatViewState extends State<ChatView> {
                           context: context,
                           builder: (_) => AlertDialog(
                             title: const Text("Delete Message?"),
-                            content: const Text("Do you want to delete this message?"),
+                            content: const Text(
+                                "Do you want to delete this message?"),
                             actions: [
                               TextButton(
                                 onPressed: () {
@@ -151,9 +145,8 @@ class _ChatViewState extends State<ChatView> {
                             vertical: 5, horizontal: 10),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isSentByMe
-                              ? Colors.blueAccent
-                              : Colors.grey[300],
+                          color:
+                              isSentByMe ? Colors.blueAccent : Colors.grey[300],
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
@@ -182,7 +175,9 @@ class _ChatViewState extends State<ChatView> {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontStyle: FontStyle.italic,
-                                  color: isSentByMe ? Colors.white70 : Colors.black54,
+                                  color: isSentByMe
+                                      ? Colors.white70
+                                      : Colors.black54,
                                 ),
                               ),
                             ]
@@ -207,13 +202,13 @@ class _ChatViewState extends State<ChatView> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.send, color: Colors.blueAccent),
+                FloatingActionButton(
                   onPressed: () {
                     final text = messageController.text.trim();
                     if (text.isNotEmpty) {
@@ -221,6 +216,8 @@ class _ChatViewState extends State<ChatView> {
                       messageController.clear();
                     }
                   },
+                  child: const Icon(Icons.send),
+                  mini: true,
                 ),
               ],
             ),

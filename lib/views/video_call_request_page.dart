@@ -100,7 +100,7 @@ class _VideoCallRequestPageState extends State<VideoCallRequestPage> {
 
   Future<void> _sendImageToFlask(Uint8List imageBytes) async {
     // Replace with your actual Flask server IP address.
-    final uri = Uri.parse("http://192.168.100.94:5001/analyze_frame");
+    final uri = Uri.parse("http://192.168.1.16:5001/analyze_frame");
 
     // Create a multipart request and attach the image.
     final request = http.MultipartRequest("POST", uri)

@@ -1,6 +1,8 @@
 import 'package:feeling_sync_chat/services/notification_service.dart';
+import 'package:feeling_sync_chat/services/sentiment_service.dart';
 import 'package:feeling_sync_chat/services/friend_service.dart';
 import 'package:feeling_sync_chat/services/pusher_service.dart';
+import 'package:feeling_sync_chat/services/chat_service.dart';
 import 'package:feeling_sync_chat/services/auth_service.dart';
 import 'package:feeling_sync_chat/bindings/auth_binding.dart';
 import 'package:feeling_sync_chat/services/api_service.dart';
@@ -9,18 +11,19 @@ import 'package:feeling_sync_chat/routes/app_pages.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-// Remove the MyApp widget completely or modify main.dart to use just one GetMaterialApp:
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize services
   await Get.putAsync(() => SharedPreferences.getInstance());
   Get.put(ApiService());
   final pusherService = Get.put(PusherService());
-  await pusherService.init(); 
-  Get.put<AuthService>(AuthService());
-  Get.put(NotificationService()); // Add this line
-  Get.put(FriendService()); // Also recommended since you're using it
+  await pusherService.init();
+  final authService = Get.put<AuthService>(AuthService());
+  await authService.loadCurrentUserId();
+  Get.put(SentimentService());
+  Get.put(ChatService());
+  Get.put(NotificationService());
+  Get.put(FriendService());
 
   runApp(GetMaterialApp(
     debugShowCheckedModeBanner: false,

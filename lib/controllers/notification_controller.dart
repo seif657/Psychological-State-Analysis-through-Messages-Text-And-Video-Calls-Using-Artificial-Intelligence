@@ -1,6 +1,7 @@
 import 'package:feeling_sync_chat/models/notification_model.dart' as model;
 import 'package:feeling_sync_chat/services/notification_service.dart';
 import 'package:feeling_sync_chat/services/pusher_service.dart';
+import 'package:feeling_sync_chat/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -8,24 +9,25 @@ class NotificationController extends GetxController {
   // Dependencies
   final NotificationService _notificationService;
   final PusherService _pusherService;
-
+  final AuthService _authService; // ADD THIS
   // Reactive State
   final RxList<model.Notification> notifications = <model.Notification>[].obs;
   final RxBool isLoading = false.obs;
   final RxString error = ''.obs;
   final RxInt unreadCount = 0.obs;
-
   NotificationController({
     NotificationService? notificationService,
     PusherService? pusherService,
-  })  : _notificationService = notificationService ?? Get.find<NotificationService>(),
-        _pusherService = pusherService ?? Get.find<PusherService>();
-
+    AuthService? authService, // ADD THIS
+  })  : _notificationService =
+            notificationService ?? Get.find<NotificationService>(),
+        _pusherService = pusherService ?? Get.find<PusherService>(),
+        _authService = authService ?? Get.find<AuthService>(); //ADD THIS
   @override
   void onInit() {
     super.onInit();
     fetchNotifications();
-    _setupRealtimeUpdates();
+    _setupRealtimeUpdates(); // This now properly handles async
   }
 
   /// Wrapper: Fetch notifications via service, update state
@@ -56,13 +58,26 @@ class NotificationController extends GetxController {
     }
   }
 
-  void _setupRealtimeUpdates() {
-    _pusherService.subscribeToPrivateChannel('notifications.${_getUserId()}');
-    _pusherService.bindEvent('new-notification', (data) {
-      final notification = model.Notification.fromJson(data);
-      notifications.insert(0, notification);
-      unreadCount.value++;
-    });
+  /// FIXED: Now properly async and waits for channel subscription
+  Future<void> _setupRealtimeUpdates() async {
+    try {
+      final userId = _getUserId();
+      if (userId == null) {
+        Get.log('User ID not available, skipping Pusher setup');
+        return;
+      }
+      // Wait for channel subscription to complete before binding
+      await _pusherService.subscribeToPrivateChannel('notifications.$userId');
+      // Now safely bind to events
+      _pusherService.bindEvent('new-notification', (data) {
+        final notification = model.Notification.fromJson(data);
+        notifications.insert(0, notification);
+        unreadCount.value++;
+      });
+    } catch (e) {
+      Get.log('Failed to setup realtime updates: $e');
+      _showError('Failed to setup real-time notifications');
+    }
   }
 
   Future<void> markAsRead(model.Notification notification) async {
@@ -82,9 +97,9 @@ class NotificationController extends GetxController {
     unreadCount.value = notifications.where((n) => !n.isRead).length;
   }
 
-  int _getUserId() {
-    // TODO: Replace with actual user ID retrieval logic
-    return 0;
+  /// FIXED: Now retrieves actual user ID from AuthService
+  int? _getUserId() {
+    return _authService.currentUserId;
   }
 
   void _showError(String message) {
@@ -99,7 +114,10 @@ class NotificationController extends GetxController {
 
   @override
   void onClose() {
-    _pusherService.unsubscribe('notifications.${_getUserId()}');
+    final userId = _getUserId();
+    if (userId != null) {
+      _pusherService.unsubscribe('notifications.$userId');
+    }
     super.onClose();
   }
 }

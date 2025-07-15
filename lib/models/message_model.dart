@@ -1,7 +1,6 @@
 import 'package:feeling_sync_chat/services/auth_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
-
 @immutable
 class Message {
   final int id;
@@ -12,7 +11,6 @@ class Message {
   final bool isPending;
   final bool isFailed;
   final int? replyToId;
-
   const Message({
     required this.id,
     required this.userId,
@@ -23,7 +21,6 @@ class Message {
     this.isFailed = false,
     this.replyToId,
   });
-
   factory Message.fromJson(Map<String, dynamic> json) {
     return Message(
       id: json['id'] as int,
@@ -34,7 +31,6 @@ class Message {
       replyToId: json['reply_to_id'] as int?,
     );
   }
-
   Message copyWith({
     int? id,
     int? userId,
@@ -56,7 +52,6 @@ class Message {
       replyToId: replyToId ?? this.replyToId,
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -67,7 +62,6 @@ class Message {
       if (replyToId != null) 'reply_to_id': replyToId,
     };
   }
-
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -81,7 +75,6 @@ class Message {
         other.isFailed == isFailed &&
         other.replyToId == replyToId;
   }
-
   @override
   int get hashCode {
     return Object.hash(
@@ -95,7 +88,6 @@ class Message {
       replyToId,
     );
   }
-
   @override
   String toString() {
     return 'Message('
@@ -108,14 +100,27 @@ class Message {
         'isFailed: $isFailed, '
         'replyToId: $replyToId)';
   }
-
   /// Helper methods
   bool get isPositive => sentiment == 'positive';
   bool get isNegative => sentiment == 'negative';
   bool get isNeutral => sentiment == 'neutral';
-
+  
+  /// Check if message is from a specific user
+  bool isFromUser(int currentUserId) {
+    return userId == currentUserId;
+  }
+  
   bool get isFromCurrentUser {
-    final authService = Get.find<AuthService>();
-    return userId == authService.currentUserId;
+    try {
+      final authService = Get.find<AuthService>();
+      final currentUserId = authService.currentUserId;
+      // 🔍 Debug logging
+      print(
+          '🔍 DEBUG - Message.isFromCurrentUser: messageUserId=$userId, currentUserId=$currentUserId, match=${userId == currentUserId}');
+      return userId == currentUserId;
+    } catch (e) {
+      print('❌ Error in isFromCurrentUser: $e');
+      return false;
+    }
   }
 }

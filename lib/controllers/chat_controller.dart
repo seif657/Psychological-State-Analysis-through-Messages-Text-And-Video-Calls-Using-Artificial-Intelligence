@@ -1,23 +1,20 @@
 import 'package:feeling_sync_chat/services/sentiment_service.dart';
 import 'package:feeling_sync_chat/services/pusher_service.dart';
 import 'package:feeling_sync_chat/services/chat_service.dart';
+import 'package:feeling_sync_chat/services/auth_service.dart';
 import 'package:feeling_sync_chat/models/message_model.dart';
 import 'package:get/get.dart';
-
 class ChatController extends GetxController {
   // Dependencies
   final ChatService _chatService;
   final PusherService _pusherService;
   final SentimentService _sentimentService;
-
   // Reactive state
   final RxList<Message> messages = <Message>[].obs;
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
-
   final int chatId;
   final int currentUserId; // This is a normal int, NOT reactive
-
   ChatController({
     required this.chatId,
     required this.currentUserId,
@@ -27,19 +24,25 @@ class ChatController extends GetxController {
   })  : _chatService = chatService ?? Get.find<ChatService>(),
         _pusherService = pusherService ?? Get.find<PusherService>(),
         _sentimentService = sentimentService ?? Get.find<SentimentService>();
-
   @override
   void onInit() {
     super.onInit();
+    
+    // Ensure AuthService has the correct currentUserId
+    try {
+      final authService = Get.find<AuthService>();
+      authService.setCurrentUserId(currentUserId);
+    } catch (e) {
+      print('❌ Error synchronizing AuthService currentUserId: $e');
+    }
+    
     _loadInitialMessages();
     _setupPusher();
   }
-
   Future<void> loadMessages() async {
     // Public method to load messages
     await _loadInitialMessages();
   }
-
   Future<void> _loadInitialMessages() async {
     try {
       isLoading.value = true;
@@ -50,22 +53,26 @@ class ChatController extends GetxController {
       isLoading.value = false;
     }
   }
-
-  void _setupPusher() {
-    _pusherService.subscribeToPrivateChannel('chat.$chatId');
-    _pusherService.bindEvent('new-message', (data) {
-      try {
-        final message = Message.fromJson(data);
-        _addOrUpdateMessage(message);
-      } catch (e) {
-        errorMessage.value = 'Failed to process new message';
-      }
-    });
+  /// FIXED: Now properly async and waits for channel subscription
+  Future<void> _setupPusher() async {
+    try {
+      await _pusherService.subscribeToPrivateChannel('chat.$chatId');
+      // Now safely bind to events
+      _pusherService.bindEvent('new-message', (data) {
+        try {
+          final message = Message.fromJson(data);
+          _addOrUpdateMessage(message);
+        } catch (e) {
+          errorMessage.value = 'Failed to process new message';
+        }
+      });
+    } catch (e) {
+      Get.log('Failed to setup Pusher for chat');
+      errorMessage.value = 'Failed to setup real-time messaging';
+    }
   }
-
   Future<void> sendMessage(String content) async {
     if (content.trim().isEmpty) return;
-
     final tempMessage = Message(
       id: DateTime.now().millisecondsSinceEpoch, // Temporary ID
       userId: currentUserId,
@@ -73,10 +80,8 @@ class ChatController extends GetxController {
       createdAt: DateTime.now(),
       isPending: true,
     );
-
     // Optimistic UI update
     messages.add(tempMessage);
-
     try {
       final sentiment = await _sentimentService.analyzeSentiment(content);
       final sentMessage = await _chatService.sendMessage(
@@ -84,7 +89,6 @@ class ChatController extends GetxController {
         content: content,
         sentiment: sentiment,
       );
-
       // Replace temporary message with server response
       _replaceMessage(tempMessage.id, sentMessage);
     } catch (e) {
@@ -93,7 +97,6 @@ class ChatController extends GetxController {
       errorMessage.value = 'Failed to send message';
     }
   }
-
   Future<void> deleteMessage(int messageId) async {
     try {
       await _chatService.deleteMessage(messageId);
@@ -102,11 +105,9 @@ class ChatController extends GetxController {
       errorMessage.value = 'Failed to delete message';
     }
   }
-
   void clearMessages() {
     messages.clear();
   }
-
   // Helper methods for message management
   void _addOrUpdateMessage(Message message) {
     final index = messages.indexWhere((m) => m.id == message.id);
@@ -116,15 +117,14 @@ class ChatController extends GetxController {
       messages.add(message);
     }
   }
-
   void _replaceMessage(int oldId, Message newMessage) {
     final index = messages.indexWhere((m) => m.id == oldId);
     if (index >= 0) {
       messages[index] = newMessage;
     }
   }
-
-  void _updateMessageStatus(int messageId, {bool isPending = false, bool isFailed = false}) {
+  void _updateMessageStatus(int messageId,
+      {bool isPending = false, bool isFailed = false}) {
     final index = messages.indexWhere((m) => m.id == messageId);
     if (index >= 0) {
       messages[index] = messages[index].copyWith(
@@ -133,7 +133,6 @@ class ChatController extends GetxController {
       );
     }
   }
-
   @override
   void onClose() {
     _pusherService.unsubscribe('chat.$chatId');

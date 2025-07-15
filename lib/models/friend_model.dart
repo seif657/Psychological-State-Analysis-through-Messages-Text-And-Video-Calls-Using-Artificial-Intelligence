@@ -13,11 +13,44 @@ class Friend {
 
   factory Friend.fromJson(Map<String, dynamic> json) {
     return Friend(
-      id: json['id'],
-      name: json['name'],
-      chatId: json['chat_id'],
-      lastActive: DateTime.parse(json['last_active']),
+      id: _toInt(json['id']), // ✅ Safe conversion from string/int to int
+      name: json['name'] as String,
+      chatId: _toIntOrNull(
+          json['chat_id']), // ✅ Handle missing chat_id from Laravel
+      lastActive: _parseDateTime(
+          json['last_active']), // ✅ Handle missing last_active from Laravel
     );
+  }
+
+  // ✅ Helper: Safely convert dynamic to int
+  static int _toInt(dynamic value) {
+    if (value is int) return value;
+    if (value is String) return int.parse(value);
+    throw FormatException('Cannot convert $value to int');
+  }
+
+  // ✅ Helper: Safely convert dynamic to int or null
+  static int? _toIntOrNull(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) {
+      if (value.isEmpty) return null;
+      return int.parse(value);
+    }
+    return null;
+  }
+
+  // ✅ Helper: Handle missing or invalid datetime from Laravel
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now(); // Default to now if missing
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (e) {
+        return DateTime.now(); // Fallback to now if invalid format
+      }
+    }
+    return DateTime.now(); // Default fallback
   }
 
   Friend copyWith({
